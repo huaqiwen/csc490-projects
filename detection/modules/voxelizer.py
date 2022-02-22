@@ -74,12 +74,41 @@ class Voxelizer(torch.nn.Module):
         Returns:
             BEV occupacy image as a [batch_size x D x H x W] tensor.
         """
-        # TODO: Replace this stub code.
-        return torch.zeros(
+        batch_count = len(pointclouds)
+        eps = 1e-4
+
+        # Init result BEV occupancy image
+        res = torch.zeros(
             (len(pointclouds), self._depth, self._height, self._width),
             dtype=torch.bool,
             device=pointclouds[0].device,
         )
+
+        # Filter out out-of-bounds (x, y) LiDAR points and clip z coordinates
+        for i in range(batch_count):
+            pc = pointclouds[i]
+            pointclouds[i] = pc[
+                (self._x_min <= pc[:, 0]) & (pc[:, 0] <= self._x_max) &
+                (self._y_min <= pc[:, 1]) & (pc[:, 1] <= self._y_max)
+            ]
+            # Minus an epsilon to zmax so that the index (i) calculated later wont touch max length
+            pointclouds[i][:, 2] = pointclouds[i][:, 2].clip(min=self._z_min, max=self._z_max - eps)
+
+        # Iter through all pointclouds: find occupied cells & modify those cells to True (occupied) in res
+        for i in range(batch_count):
+            pc = pointclouds[i]
+
+            # Find (i, j, k) using the algorithm described in docstring 
+            occupied = pc.index_select(1, torch.tensor([2, 1, 0]))                  # reorder to (z, y, x)
+            occupied *= torch.tensor([1, -1, 1])
+            occupied += torch.tensor([-self._z_min, self._y_max, -self._x_min])
+            occupied /= self._step
+            occupied = occupied.floor().long()
+
+            # Modify occupancy in res
+            res[i][occupied[:, 0], occupied[:, 1], occupied[:, 2]] = True
+
+        return res
 
     def project_detections(self, detections: Detections) -> Detections:
         """Project detections to voxelized frame and filter out-of-bounds ones.
