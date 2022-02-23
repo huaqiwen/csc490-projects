@@ -114,6 +114,7 @@ class DetectionLossTargetBuilder:
         # (cx - i, cy - j) if the heatmap value at (i, j) exceeds self._heatmap_threshold.
         # If the heatmap value at (i, j) is less than or equal to self._heatmap_threshold,
         # the target offset equals (0, 0) instead.
+
         offsets = center - grid_coords
         # Mask values that are greater than the threshold
         offsets_mask = torch.zeros(offsets.shape)
@@ -127,8 +128,13 @@ class DetectionLossTargetBuilder:
         # If the heatmap value at (i, j) is less than or equal to self._heatmap_threshold,
         # the target size equals (0, 0) instead.
 
-        # TODO: Replace this stub code.
         sizes = torch.zeros(H, W, 2)
+        sizes[:, :, :] = torch.tensor([x_size, y_size])
+        # Mask the values at the coordinates which are greater than the heatmap threshold.
+        sizes_mask = torch.zeros(sizes.shape)
+        sizes_mask[heatmap > self._heatmap_threshold] = 1
+        sizes = sizes * sizes_mask
+        
 
         # 5. Create heading training targets.
         # Given the label's heading angle yaw, the target heading at pixel (i, j)
