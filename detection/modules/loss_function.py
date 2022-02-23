@@ -28,8 +28,24 @@ def heatmap_weighted_mse_loss(
         A scalar MSE loss between `predictions` and `targets`, aggregated as a
             weighted average using the provided `heatmap`.
     """
-    # TODO: Replace this stub code.
-    return torch.sum(predictions) * 0.0
+    
+    batch_size, _, H, W = targets.shape
+
+    # 1 - Compute the MSE Loss between `targets` and `predictions` along the C dimension
+    residuals = targets - predictions
+    mse_loss = torch.sum(residuals**2, axis=1)
+
+    # 2 - Compute the heatmap mask
+    # We do this because otherwise we would need to make copy
+    # inorder to avoid trampling heatmap's data
+    heatmap_mask = torch.zeros(heatmap.shape).to(mse_loss.device)
+    heatmap_mask[heatmap > heatmap_threshold] = 1
+
+    # 3 - Compute the mean mse_loss weighted by the masked heatmap
+    M = torch.count_nonzero(heatmap_mask)
+    mse_loss = torch.sum(mse_loss * heatmap_mask.reshape(batch_size, H, W)) / M
+
+    return mse_loss
 
 
 @dataclass
