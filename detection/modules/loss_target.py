@@ -143,7 +143,10 @@ class DetectionLossTargetBuilder:
         # the target heading equals (0, 0) instead.
 
         # TODO: Replace this stub code.
-        headings = torch.zeros(H, W, 2)
+        headings = torch.zeros(H * W, 2)
+        headings[:, :] = torch.tensor([math.sin(yaw), math.cos(yaw)])
+        headings = (headings.T * heatmap_mask).T
+        headings = headings.reshape((H, W, 2))
 
         # 6. Concatenate training targets into a [7 x H x W] tensor.
         targets = torch.cat([heatmap[:, :, None], offsets, sizes, headings], dim=-1)
