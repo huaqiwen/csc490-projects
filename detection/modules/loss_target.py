@@ -114,9 +114,12 @@ class DetectionLossTargetBuilder:
         # (cx - i, cy - j) if the heatmap value at (i, j) exceeds self._heatmap_threshold.
         # If the heatmap value at (i, j) is less than or equal to self._heatmap_threshold,
         # the target offset equals (0, 0) instead.
+        offsets = center - grid_coords
+        # Mask values that are greater than the threshold
+        offsets_mask = torch.zeros(offsets.shape)
+        offsets_mask[heatmap > self._heatmap_threshold] = 1
+        offsets = offsets * offsets_mask
 
-        # TODO: Replace this stub code.
-        offsets = torch.zeros(H, W, 2)
 
         # 4. Create box size training target.
         # Given the label's bounding box size (x_size, y_size), the target size at pixel (i, j)
