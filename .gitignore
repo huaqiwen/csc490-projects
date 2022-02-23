@@ -1,6 +1,7 @@
 # dataset and output
 dataset
 output
+outputs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -131,3 +132,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+pandaset_0.zip
+pandaset_0
