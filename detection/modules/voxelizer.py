@@ -88,8 +88,8 @@ class Voxelizer(torch.nn.Module):
         for i in range(batch_count):
             pc = pointclouds[i]
             pointclouds[i] = pc[
-                (self._x_min <= pc[:, 0]) & (pc[:, 0] <= self._x_max) &
-                (self._y_min <= pc[:, 1]) & (pc[:, 1] <= self._y_max)
+                (self._x_min <= pc[:, 0]) & (pc[:, 0] < self._x_max) &
+                (self._y_min <= pc[:, 1]) & (pc[:, 1] < self._y_max)
             ]
             # Minus an epsilon to zmax so that the index (i) calculated later wont touch max length
             pointclouds[i][:, 2] = pointclouds[i][:, 2].clip(min=self._z_min, max=self._z_max - eps)
