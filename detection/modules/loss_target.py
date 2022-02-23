@@ -33,10 +33,10 @@ def create_heatmap(grid_coords: Tensor, center: Tensor, scale: float) -> Tensor:
     cx, cy = center
 
     # Resize grid_coords to be [(H * W) x 2] for easier calculation
-    grid_coords.resize_(H * W, 2)
+    temp = grid_coords.reshape(H * W, 2)
 
     # Calculate raw heat with the input Gaussian kernel
-    heatmap = torch.exp(-((cx - grid_coords[:, 0]) ** 2 + (cy - grid_coords[:, 1]) ** 2) / scale)
+    heatmap = torch.exp(-((cx - temp[:, 0]) ** 2 + (cy - temp[:, 1]) ** 2) / scale)
 
     # Normalize and reshape back to [H x W]
     heatmap /= heatmap.max()
@@ -115,42 +115,35 @@ class DetectionLossTargetBuilder:
         # If the heatmap value at (i, j) is less than or equal to self._heatmap_threshold,
         # the target offset equals (0, 0) instead.
 
-        # Generate the thresholded heatmap mask for future reference
-        heatmap_mask = torch.zeros(heatmap.shape)
-        heatmap_mask[heatmap > self._heatmap_threshold] = 1
-        heatmap_mask = heatmap_mask.reshape(W * H)
+        # Generate the thresholded heatmap mask tensor for future reference 
+        heatmap_mask = heatmap <= self._heatmap_threshold
 
-        offsets = center - grid_coords
-        offsets = (offsets.T * heatmap_mask).T
-        offsets = offsets.reshape((H, W, 2))
-        
+        # Calculate target offset and mask off points where the heatmap value is below threshold
+        offsets = (center - grid_coords).long()
+        offsets[heatmap_mask] = torch.tensor([0, 0])
 
         # 4. Create box size training target.
         # Given the label's bounding box size (x_size, y_size), the target size at pixel (i, j)
         # equals (x_size, y_size) if the heatmap value at (i, j) exceeds self._heatmap_threshold.
         # If the heatmap value at (i, j) is less than or equal to self._heatmap_threshold,
         # the target size equals (0, 0) instead.
-
-        sizes = torch.zeros(H * W, 2)
+        sizes = torch.zeros_like(grid_coords)
         sizes[:, :] = torch.tensor([x_size, y_size])
-        sizes = (sizes.T * heatmap_mask).T
-        sizes = sizes.reshape((H, W, 2))
+        sizes[heatmap_mask] = torch.tensor([0, 0])
 
         # 5. Create heading training targets.
         # Given the label's heading angle yaw, the target heading at pixel (i, j)
         # equals (sin(yaw), cos(yaw)) if the heatmap value at (i, j) exceeds self._heatmap_threshold.
         # If the heatmap value at (i, j) is less than or equal to self._heatmap_threshold,
         # the target heading equals (0, 0) instead.
-
-        # TODO: Replace this stub code.
-        headings = torch.zeros(H * W, 2)
+        headings = torch.zeros(H, W, 2)
         headings[:, :] = torch.tensor([math.sin(yaw), math.cos(yaw)])
-        headings = (headings.T * heatmap_mask).T
-        headings = headings.reshape((H, W, 2))
+        headings[heatmap_mask] = torch.tensor([0., 0.])
 
         # 6. Concatenate training targets into a [7 x H x W] tensor.
         targets = torch.cat([heatmap[:, :, None], offsets, sizes, headings], dim=-1)
         return targets.permute(2, 0, 1)  # [7 x H x W]
+
 
     def build_target_tensor(self, labels: Detections) -> Tensor:
         """Return the training target tensor for the given labels.
