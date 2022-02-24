@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+import numpy as np
 import torch
 from torch import Tensor, nn
 
@@ -116,7 +117,40 @@ class DetectionModel(nn.Module):
         Returns:
             A set of 2D bounding box detections.
         """
-        # TODO: Replace this stub code.
-        return Detections(
-            torch.zeros((0, 3)), torch.zeros(0), torch.zeros((0, 2)), torch.zeros(0)
-        )
+
+        # 1. Run one forward pass to obtain dense detection outputs X, note that the batch_size = 1
+        x = self.forward(bev_lidar[None, :])[0]     # [7 x H x W]
+
+        # 2.1. Find maximums for 5x5 sliding windows of the heatmap
+        heatmap = x[0].clone().detach()             # [H x W]
+        m = nn.MaxPool2d(5, stride=1, padding=2)
+        heatmap_maxs = m(heatmap[None, :])[0]       # note that MaxPool2d needs to be batched
+
+        # 2.2. Find top k local maxima indices in heatmap that equals to the max of its 5x5 window
+        heatmap[heatmap != heatmap_maxs] = float('-inf')
+        _, i = heatmap.flatten().topk(k)
+        i = torch.tensor(np.array(np.unravel_index(i.numpy(), heatmap.shape))).T       # detection indices: [K x 2]
+
+        # 6. Keep only the detections with a score higher than score_threshold
+        keep_i = (heatmap[i[:, 0], i[:, 1]] > score_threshold).nonzero().flatten()
+        i = i[keep_i]
+
+        # 2.3. Find the [K x 2] centroids where each row is (x, y)
+        centroids = i.float().index_select(1, torch.tensor([1, 0]))
+
+        # 2.4. Find scores of each detections
+        scores = heatmap[i[:, 0], i[:, 1]]
+
+        # 3. Refine detections by adding predicted offsets
+        centroids[:, 0] += x[1][i[:, 0], i[:, 1]]
+        centroids[:, 1] += x[2][i[:, 0], i[:, 1]]
+
+        # 4. Find bounding box sizes of each detections
+        x_sizes = x[3][i[:, 0], i[:, 1]]
+        y_sizes = x[4][i[:, 0], i[:, 1]]
+        boxes = torch.stack((x_sizes, y_sizes), dim=1)
+
+        # 5. Find heading yaws
+        yaws = torch.atan2(x[5][i[:, 0], i[:, 1]], x[6][i[:, 0], i[:, 1]])
+
+        return Detections(centroids, yaws, boxes, scores)
