@@ -43,7 +43,7 @@ def heatmap_weighted_mse_loss(
 
     # 3 - Compute the mean mse_loss weighted by the masked heatmap
     M = torch.count_nonzero(heatmap_mask)
-    mse_loss = torch.sum(mse_loss * heatmap_mask.reshape(batch_size, H, W)) / M
+    mse_loss = torch.sum(mse_loss * (heatmap * heatmap_mask).reshape(batch_size, H, W)) / M
 
     return mse_loss
 
