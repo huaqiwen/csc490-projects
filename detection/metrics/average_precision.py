@@ -94,7 +94,9 @@ def compute_precision_recall_curve(
 
         precision[i] = tp / (tp + fp)
 
-    return PRCurve(precision, torch.zeros(0))
+    # Calculate the recal for the PRCurve
+
+    return PRCurve(precision, torch.ones(TP_vec.shape))
 
 
 def compute_area_under_curve(curve: PRCurve) -> float:
@@ -112,8 +114,13 @@ def compute_area_under_curve(curve: PRCurve) -> float:
     Returns:
         The area under the curve, as defined above.
     """
-    # TODO: Replace this stub code.
-    return torch.sum(curve.recall).item() * 0.0
+    ri = curve.recall
+    ri_minus_one = torch.zeros(ri.shape[0])
+    ri_minus_one[1:] = ri[:-1]
+    
+    AP = torch.sum(curve.precision * (ri - ri_minus_one))
+
+    return AP
 
 
 def compute_average_precision(
