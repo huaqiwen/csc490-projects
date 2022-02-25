@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from re import A
 from typing import List
 
 import torch
@@ -61,8 +62,39 @@ def compute_precision_recall_curve(
     Returns:
         A precision/recall curve.
     """
-    # TODO: Replace this stub code.
-    return PRCurve(torch.zeros(0), torch.zeros(0))
+    
+    # Compute the TP, FN, and DS vectors
+    TP_vec, FN_vec, DS_vec = torch.zeros(0), torch.zeros(0), torch.zeros(0), torch.zeros(0)
+    for frame in frames:
+        detections = frame.detections
+        labels = frame.labels
+        
+        # Distance between all combinations of centroids [N, M] shape matrix
+        dist = torch.cdist(detections.centroids, labels.centroids, p=2)
+        dist_lt_threshold = dist < threshold
+
+        local_TP_vec = torch.any(dist_lt_threshold, axis=1).long()
+        local_FN_vec = torch.any(dist_lt_threshold, axis=0).long()
+
+        TP_vec = torch.concat((TP_vec, local_TP_vec), axis=0)
+        FN_vec = torch.concat((FN_vec, local_FN_vec), axis=0)
+        DS_vec = torch.concat((DS_vec, detections.scores), axis=0)
+
+    # Sort the matches by the corresponding detection scores in DS_vec.
+    sorting_index = torch.argsort(DS_vec).flip(dims=(0,))
+    TP_vec = TP_vec[sorting_index]
+    DS_vec = DS_vec[sorting_index]
+
+    # Calculate the prescision for the PRCurve
+    precision = torch.zeros(TP_vec.shape)
+    for i in range(precision.shape[0]):
+        vec_subset = TP_vec[:i+1]
+        tp = len(vec_subset == 1)
+        fp = len(vec_subset == 0)
+
+        precision[i] = tp / (tp + fp)
+
+    return PRCurve(precision, torch.zeros(0))
 
 
 def compute_area_under_curve(curve: PRCurve) -> float:
