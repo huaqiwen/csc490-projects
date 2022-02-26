@@ -118,6 +118,8 @@ class DetectionModel(nn.Module):
             A set of 2D bounding box detections.
         """
 
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
         # 1. Run one forward pass to obtain dense detection outputs X, note that the batch_size = 1
         x = self.forward(bev_lidar[None, :])[0]     # [7 x H x W]
 
@@ -129,14 +131,14 @@ class DetectionModel(nn.Module):
         # 2.2. Find top k local maxima indices in heatmap that equals to the max of its 5x5 window
         heatmap[heatmap != heatmap_maxs] = float('-inf')
         _, i = heatmap.flatten().topk(k)
-        i = torch.tensor(np.array(np.unravel_index(i.numpy(), heatmap.shape))).T       # detection indices: [K x 2]
+        i = torch.tensor(np.array(np.unravel_index(i.cpu().numpy(), heatmap.shape))).T.to(device)     # detection indices: [K x 2]
 
         # 6. Keep only the detections with a score higher than score_threshold
         keep_i = (heatmap[i[:, 0], i[:, 1]] > score_threshold).nonzero().flatten()
         i = i[keep_i]
 
         # 2.3. Find the [K x 2] centroids where each row is (x, y)
-        centroids = i.float().index_select(1, torch.tensor([1, 0]))
+        centroids = i.float().index_select(1, torch.tensor([1, 0]).to(device))
 
         # 2.4. Find scores of each detections
         scores = heatmap[i[:, 0], i[:, 1]]

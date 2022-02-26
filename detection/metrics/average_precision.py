@@ -85,18 +85,19 @@ def compute_precision_recall_curve(
     TP_vec = TP_vec[sorting_index]
     DS_vec = DS_vec[sorting_index]
 
-    # Calculate the prescision for the PRCurve
+    # Calculate the prescision and precision for the PRCurve
     precision = torch.zeros(TP_vec.shape)
+    recall = torch.zeros(FN_vec.shape)
+    fn = torch.sum(FN_vec)
     for i in range(precision.shape[0]):
         vec_subset = TP_vec[:i+1]
         tp = len(vec_subset == 1)
         fp = len(vec_subset == 0)
 
         precision[i] = tp / (tp + fp)
+        recall[i] = tp / (tp + fn)
 
-    # Calculate the recal for the PRCurve
-
-    return PRCurve(precision, torch.ones(TP_vec.shape))
+    return PRCurve(precision, recall)
 
 
 def compute_area_under_curve(curve: PRCurve) -> float:
@@ -136,5 +137,7 @@ def compute_average_precision(
     Returns:
         A dataclass consisting of a PRCurve and its average precision.
     """
-    # TODO: Replace this stub code.
-    return AveragePrecisionMetric(0.0, PRCurve(torch.zeros(0), torch.zeros(0)))
+    pr_curve = compute_precision_recall_curve(frames, threshold)
+    auc = compute_area_under_curve(pr_curve)
+
+    return AveragePrecisionMetric(auc, pr_curve)
