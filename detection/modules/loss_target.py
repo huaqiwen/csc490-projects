@@ -7,8 +7,78 @@ from torch import Tensor
 from detection.modules.loss_function import DetectionLossConfig
 from detection.types import Detections
 
+def rotation_matrix(yaw: float) -> Tensor:
+    """Generate a 2D rotation matrix given the yaw."""
+    c = math.cos(yaw)
+    s = math.sin(yaw)
 
-def create_heatmap(grid_coords: Tensor, center: Tensor, scale: float) -> Tensor:
+    rotation = torch.tensor([
+        [c, -s],
+        [s, c]
+    ])
+
+    return rotation
+
+def scale_matrix(x_size: float, y_size: float) -> Tensor:
+    scaled = torch.zeros((2, 2))
+    scaled[0,0] = x_size
+    scaled[1,1] = y_size
+    scaled /= 4.0
+
+    return scaled
+
+def isotropic_heatmap(grid_coords: Tensor, center: Tensor, scale: float, size: Tuple, yaw: float) -> Tensor:
+    H, W, _ = grid_coords.shape
+    cx, cy = center
+
+    # Resize grid_coords to be [(H * W) x 2] for easier calculation
+    temp = grid_coords.reshape(H * W, 2)
+
+    # Calculate raw heat with the input Gaussian kernel
+    heatmap = torch.exp(-((cx - temp[:, 0]) ** 2 + (cy - temp[:, 1]) ** 2) / scale)
+
+    # Normalize and reshape back to [H x W]
+    heatmap /= heatmap.max()
+    heatmap.resize_(H, W)
+
+    return heatmap
+
+def anisotropic_heatmap(grid_coords: Tensor, center: Tensor, scale: float, size: Tuple, yaw: float) -> Tensor:
+    H, W, _ = grid_coords.shape
+    cx, cy = center
+
+    # Resize grid_coords to be [(H * W) x 2] for easier calculation
+    stack = grid_coords.reshape(H * W, 2).float()
+
+    # Create the rotation and scaling matricies which form the covariance matrix
+    R = rotation_matrix(yaw)
+    S = scale_matrix(size[0], size[1])
+    
+    # Set up the mean and covariance
+    mean = torch.tensor([[cx, cy]])
+    cov = R.matmul(S.matmul(S.matmul(R.T)))
+
+    # Compute the determinant and the covariance inverse
+    cov_det = torch.det(cov).item()
+    cov_inv = torch.inverse(cov)
+
+    # temp after mean shift
+    stack -= mean
+
+    # Compute the gaussian pdf
+    exponent = -0.5 * cov_inv.matmul(stack.T).T * stack
+    exponent = torch.sum(exponent, axis=1)
+    factor = 1.0 / (abs(2 * math.pi) * math.sqrt(cov_det))
+
+    heatmap_pdf = factor * torch.exp(exponent)
+
+    # Normalize and reshape back to [H x W]
+    heatmap_pdf /= heatmap_pdf.max()
+    heatmap_pdf.resize_(H, W)
+
+    return heatmap_pdf
+
+def create_heatmap(grid_coords: Tensor, center: Tensor, scale: float, size: Tuple, yaw: float) -> Tensor:
     """Return a heatmap based on a Gaussian kernel with center `center` and scale `scale`.
 
     Specifically, each pixel with coordinates (x, y) is assigned a heatmap value
@@ -25,24 +95,17 @@ def create_heatmap(grid_coords: Tensor, center: Tensor, scale: float) -> Tensor:
         center: A [2] tensor containing the (x, y) coordinate of the center.
             This argument controls the kernel's center.
         scale: A scalar value that controls the kernel's scale.
-
+        size: (x_size, y_size) pair denoting size of label
+        yaw: The rotation angle of the label
     Returns:
         An [H x W] heatmap tensor, normalized such that its peak is 1.
     """
-    H, W, _ = grid_coords.shape
-    cx, cy = center
-
-    # Resize grid_coords to be [(H * W) x 2] for easier calculation
-    temp = grid_coords.reshape(H * W, 2)
-
-    # Calculate raw heat with the input Gaussian kernel
-    heatmap = torch.exp(-((cx - temp[:, 0]) ** 2 + (cy - temp[:, 1]) ** 2) / scale)
-
-    # Normalize and reshape back to [H x W]
-    heatmap /= heatmap.max()
-    heatmap.resize_(H, W)
-
-    return heatmap
+    
+    use_isotropic_guassian = False
+    if use_isotropic_guassian:
+        return isotropic_heatmap(grid_coords, center, scale, size, yaw)
+    else:
+        return anisotropic_heatmap(grid_coords, center, scale, size, yaw)
 
 
 class DetectionLossTargetBuilder:
@@ -107,7 +170,7 @@ class DetectionLossTargetBuilder:
         # 2. Create heatmap training targets by invoking the `create_heatmap` function.
         center = torch.tensor([cx, cy])
         scale = (x_size ** 2 + y_size ** 2) / self._heatmap_norm_scale
-        heatmap = create_heatmap(grid_coords, center=center, scale=scale)  # [H x W]
+        heatmap = create_heatmap(grid_coords, center=center, scale=scale, size=(x_size, y_size), yaw=yaw)  # [H x W]
 
         # 3. Create offset training targets.
         # Given the label's center (cx, cy), the target offset at pixel (i, j) equals
