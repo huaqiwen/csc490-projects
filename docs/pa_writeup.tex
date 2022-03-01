@@ -47,14 +47,13 @@
 		\begin{subfigure}[t]{\textwidth}
 			\centering
 			\includegraphics[width=\linewidth]{images/vox000_step0-25.png}
-			\vspace*{-10mm}
 			\caption{step = 0.25}
 		\end{subfigure}
+		\vspace*{1mm}
 	  
 		\begin{subfigure}[t]{\textwidth}
 			\centering
 			\includegraphics[width=\linewidth]{images/vox000_step0-50.png}
-			\vspace*{-10mm}
 			\caption{step = 0.50}
 		\end{subfigure}
 	\end{figure}
@@ -63,14 +62,13 @@
 		\begin{subfigure}[t]{\textwidth}
 			\centering
 			\includegraphics[width=\linewidth]{images/vox000_step1-00.png}
-			\vspace*{-10mm}
 			\caption{step = 1.00}
 		\end{subfigure}
+		\vspace*{1mm}
 	  
 		\begin{subfigure}[t]{\textwidth}
 			\centering
 			\includegraphics[width=\linewidth]{images/vox000_step2-00.png}
-			\vspace*{-10mm}
 			\caption{step = 2.00}
 		\end{subfigure}
 	\end{figure}
@@ -78,5 +76,19 @@
 	From the plots above and below, we can see that the image with the highest resolution (a) captures much more information than the image with the lowest resolution (d). However, in order to have high fidelity of the voxel grid, the grid size also needs to be larger. Namely, image (a) has a size of 600 by 400 while image (d) has a size of 75 by 50; the size of the former grid is 64 times larger than the latter. 
 
 	Therefore, we can conclude that the fidelity of the voxel grid comes at the cost of larger memory consumption (to store the larger grid). In addition, performance is also sacrificed as more captured information (voxel points) leads to more intensive computations. 
+
+	\subsection{Model Training \& Inference}
+
+	\textbf{Part 5:} We overfit the detector to a single frame of PandaSet using the \verb|overfit| command. The resulting detections after overfitting perfectly matches all labeled vehicles in centroids, sizes, and headings. 
+
+	In the figure (Figure 3) below, the green boxes represent the ground truth labels and the red boxes represent the detections:
+
+	\begin{figure}[h]
+		\centering
+		\includegraphics[width=\linewidth]{images/det_overfit.png}
+		\caption{Detections after overfitting a single frame of PandaSet}
+		\label{Label}
+	\end{figure}
+	
 
 \end{document}
