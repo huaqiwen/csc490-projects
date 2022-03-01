@@ -1,5 +1,8 @@
 # CSC490 Module 1 - Part A
-Eric Hua and Ben Weisz
+
+### Eric Hua and Ben Weisz
+
+
 
 Things I need to do:
 - Set the log frequency to 10 and graph the loss to determine a good stopping iteration
