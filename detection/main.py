@@ -1,6 +1,6 @@
 import os
 import random
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 import torch
@@ -248,13 +248,7 @@ def test(
 
     # Setup model for all classes
     model_config = DetectionModelConfig()
-    class_models = {}
-    for class_ in DETECTING_CLASSES:
-        model = DetectionModel(model_config)
-        if checkpoint_path is not None and class_ in class_checkpoint_paths:
-            model.load_state_dict(torch.load(class_checkpoint_paths[class_], map_location="cpu"))
-        model = model.to(device)
-        class_models[class_] = model
+    class_models = init_multiclass_models(model_config, device, checkpoint_path)
 
     # setup data
     dataset = PandasetDataset(data_root, model_config, test=True)
@@ -333,6 +327,31 @@ def evaluate(
     plt.close("all")
 
     print(result_df)
+
+
+@torch.no_grad()
+def init_multiclass_models(
+    model_config: DetectionModelConfig, 
+    device, 
+    checkpoint_path: Optional[str] = None
+) -> Dict[LabelClass, DetectionModel]:
+    # Split checkpoint path for all classes
+    class_checkpoint_paths = {}
+    if checkpoint_path is not None:
+        for path in checkpoint_path.split("\\"):
+            class_ = path[4: path.index('.pth')]
+            class_checkpoint_paths[class_] = path
+
+    # Setup model for all classes
+    class_models = {}
+    for class_ in DETECTING_CLASSES:
+        model = DetectionModel(model_config)
+        if checkpoint_path is not None and class_ in class_checkpoint_paths:
+            model.load_state_dict(torch.load(class_checkpoint_paths[class_], map_location="cpu"))
+        model = model.to(device)
+        class_models[class_] = model
+    
+    return class_models
 
 
 if __name__ == "__main__":
