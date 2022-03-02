@@ -13,6 +13,7 @@ from detection.model import DetectionModel, DetectionModelConfig
 from detection.modules.loss_function import DetectionLossFunction
 from detection.utils.visualization import visualize_detections
 
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 def overfit(
     data_root: str,

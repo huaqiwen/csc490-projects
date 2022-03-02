@@ -18,6 +18,10 @@ from detection.pandaset.util import (
 )
 
 
+# The classes of interest
+DETECTING_CLASSES = [LabelClass.CAR, LabelClass.PEDESTRIAN, LabelClass.BICYCLE]
+
+
 @dataclass
 class PandasetConfig:
     """Configuration class for the Pandaset dataset.
@@ -30,7 +34,7 @@ class PandasetConfig:
 
     basepath: str
     sequence_ids: Optional[Sequence[int]] = None
-    classes_to_keep: Optional[Sequence[LabelClass]] = (LabelClass.CAR,)
+    classes_to_keep: Optional[Sequence[LabelClass]] = tuple(DETECTING_CLASSES)
 
 
 @dataclass
