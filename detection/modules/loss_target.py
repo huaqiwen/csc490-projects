@@ -101,7 +101,7 @@ def create_heatmap(grid_coords: Tensor, center: Tensor, scale: float, size: Tupl
         An [H x W] heatmap tensor, normalized such that its peak is 1.
     """
     
-    use_isotropic_guassian = False
+    use_isotropic_guassian = True
     if use_isotropic_guassian:
         return isotropic_heatmap(grid_coords, center, scale, size, yaw)
     else:

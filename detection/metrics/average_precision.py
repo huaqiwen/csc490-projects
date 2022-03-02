@@ -64,7 +64,7 @@ def compute_precision_recall_curve(
     """
     
     # Compute the TP, FN, and DS vectors
-    TP_vec, FN_vec, DS_vec = torch.zeros(0), torch.zeros(0), torch.zeros(0), torch.zeros(0)
+    TP_vec, FN_vec, DS_vec = torch.zeros(0), torch.zeros(0), torch.zeros(0)
     for frame in frames:
         detections = frame.detections
         labels = frame.labels
@@ -87,12 +87,12 @@ def compute_precision_recall_curve(
 
     # Calculate the prescision and precision for the PRCurve
     precision = torch.zeros(TP_vec.shape)
-    recall = torch.zeros(FN_vec.shape)
+    recall = torch.zeros(TP_vec.shape)
     fn = torch.sum(FN_vec)
     for i in range(precision.shape[0]):
         vec_subset = TP_vec[:i+1]
-        tp = len(vec_subset == 1)
-        fp = len(vec_subset == 0)
+        tp = torch.count_nonzero(vec_subset == 1).item()
+        fp = torch.count_nonzero(vec_subset == 0).item()
 
         precision[i] = tp / (tp + fp)
         recall[i] = tp / (tp + fn)
