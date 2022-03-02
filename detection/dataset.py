@@ -6,7 +6,7 @@ from torch import Tensor
 from detection.model import DetectionModelConfig
 from detection.modules.loss_target import DetectionLossTargetBuilder
 from detection.modules.voxelizer import Voxelizer
-from detection.pandaset.dataset import DETECTING_CLASSES, Pandaset, PandasetConfig
+from detection.pandaset.dataset import Pandaset, PandasetConfig
 from detection.pandaset.util import LabelClass
 from detection.types import Detections
 
@@ -71,7 +71,7 @@ class PandasetDataset:
             model_config.voxelizer.bev_size, model_config.loss
         )
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Dict[LabelClass, Detections]]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Dict[LabelClass, Tensor], Dict[LabelClass, Detections]]:
         """Returns training/validation data for one frame.
 
         Returns:
@@ -79,33 +79,29 @@ class PandasetDataset:
             1. A [D x H x W] tensor containing the bird's eye view voxel representation
                 of the LiDAR point cloud. Each cell is 1 if it's occupied by a LiDAR point
                 and 0 otherwise.
-            2. A [len(DETECTING_CLASSES) x 7 x H x W] tensor containing the ground truth target tensor for training
+            2. A Dict[LabelClass, [7 x H x W]] tensor containing the ground truth target tensor for training
                 the `DetectionModel` using a `DetectionLossFunction`. The 7 channels are
                 (heatmap, offset_x, offset_y, x_size, y_size, sin_theta, cos_theta).
             3. A set of ground truth detections in bird's eye view image space coordinates.
         """
         pandaset_output = self._pandaset[idx]
         lidar_bev = self._voxelizer([pandaset_output.lidar])[0]  # [D x H x W]
-        _, H, W = lidar_bev.shape
 
         # Find labels and build targets for each detecting classes
-        class_labels, targets = {}, torch.zeros((len(DETECTING_CLASSES), 7, H, W))
-        for i, class_ in enumerate(DETECTING_CLASSES):
-            if class_ in pandaset_output.labels:
-                labels = Detections(
-                    pandaset_output.labels[class_].centroids[:, :2],
-                    pandaset_output.labels[class_].yaws,
-                    pandaset_output.labels[class_].boxes[:, :2],
-                )
-                labels = self._voxelizer.project_detections(labels)
+        class_labels, class_targets = {}, {}
+        for class_ in pandaset_output.labels:
+            labels = Detections(
+                pandaset_output.labels[class_].centroids[:, :2],
+                pandaset_output.labels[class_].yaws,
+                pandaset_output.labels[class_].boxes[:, :2],
+            )
+            labels = self._voxelizer.project_detections(labels)
 
-                # Add [class_, labels] key val pair 
-                class_labels[class_] = labels;
+            # Add [class_, labels], [class, targets] key val pair 
+            class_labels[class_] = labels;
+            class_targets[class_] = self._target_builder.build_target_tensor(labels)
 
-                # Build targets for the current class
-                targets[i] = self._target_builder.build_target_tensor(labels)
-
-        return lidar_bev.float(), targets, class_labels
+        return lidar_bev.float(), class_targets, class_labels
 
     def __len__(self) -> None:
         """Return the size of this dataset."""
@@ -117,4 +113,4 @@ def custom_collate(
 ) -> Tuple[Tensor, Tensor, List[Detections]]:
     """Custom collate function for torch dataloader."""
     bev, gt_tensor, labels = list(zip(*batch))
-    return torch.stack(bev), torch.stack(gt_tensor), labels
+    return torch.stack(bev), gt_tensor[0], labels
