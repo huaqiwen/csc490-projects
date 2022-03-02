@@ -30,6 +30,7 @@ class DetectionModelConfig:
             heading_loss_weight=100.0,
             heatmap_threshold=0.01,
             heatmap_norm_scale=20.0,
+            use_isotropic_gaussian=True,
         )
     )
 

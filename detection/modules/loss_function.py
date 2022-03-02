@@ -4,7 +4,6 @@ from typing import Tuple
 import torch
 from torch import Tensor
 
-
 def heatmap_weighted_mse_loss(
     targets: Tensor, predictions: Tensor, heatmap: Tensor, heatmap_threshold: float
 ) -> Tensor:
@@ -47,7 +46,6 @@ def heatmap_weighted_mse_loss(
 
     return mse_loss
 
-
 @dataclass
 class DetectionLossConfig:
     """Detection loss function configuration.
@@ -63,6 +61,8 @@ class DetectionLossConfig:
         heatmap_norm_scale: A scalar value that scales the spread of a heatmap.
             The larger the value, the smaller the spread of the heatmap.
             See `detection/modules/loss_target.py` for usage details.
+        use_isotropic_gaussian: A boolean value indicating if an isotropic gaussian should
+            be used for building the target heat map. If False, anisotropic gaussian will be used
     """
 
     heatmap_loss_weight: float
@@ -71,6 +71,7 @@ class DetectionLossConfig:
     heading_loss_weight: float
     heatmap_threshold: float
     heatmap_norm_scale: float
+    use_isotropic_gaussian: bool
 
 
 @dataclass
