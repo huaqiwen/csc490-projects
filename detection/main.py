@@ -239,13 +239,6 @@ def test(
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     os.makedirs(output_root, exist_ok=True)
 
-    # Split checkpoint path for all classes
-    class_checkpoint_paths = {}
-    if checkpoint_path is not None:
-        for path in checkpoint_path.split("\\"):
-            class_ = path[4: path.index('.pth')]
-            class_checkpoint_paths[class_] = path
-
     # Setup model for all classes
     model_config = DetectionModelConfig()
     class_models = init_multiclass_models(model_config, device, checkpoint_path)
