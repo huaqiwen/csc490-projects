@@ -113,4 +113,4 @@ def custom_collate(
 ) -> Tuple[Tensor, Tensor, List[Detections]]:
     """Custom collate function for torch dataloader."""
     bev, gt_tensor, labels = list(zip(*batch))
-    return torch.stack(bev), gt_tensor[0], labels
+    return torch.stack(bev), {k: torch.stack((v,)) for k, v in gt_tensor[0].items()}, labels
