@@ -11,6 +11,7 @@ from detection.dataset import PandasetDataset, custom_collate
 from detection.metrics.evaluator import Evaluator
 from detection.model import DetectionModel, DetectionModelConfig
 from detection.modules.loss_function import DetectionLossFunction
+from detection.pandaset.dataset import DETECTING_CLASSES
 from detection.utils.visualization import visualize_detections
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -220,12 +221,22 @@ def test(
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     os.makedirs(output_root, exist_ok=True)
 
-    # setup model
-    model_config = DetectionModelConfig()
-    model = DetectionModel(model_config)
+    # Split checkpoint path for all classes
+    class_checkpoint_paths = {}
     if checkpoint_path is not None:
-        model.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
-    model = model.to(device)
+        for path in checkpoint_path.split("\\"):
+            class_ = path[4: path.index('.pth')]
+            class_checkpoint_paths[class_] = path
+
+    # Setup model for all classes
+    model_config = DetectionModelConfig()
+    class_models = {}
+    for class_ in DETECTING_CLASSES:
+        model = DetectionModel(model_config)
+        if checkpoint_path is not None and class_ in class_checkpoint_paths:
+            model.load_state_dict(torch.load(class_checkpoint_paths[class_], map_location="cpu"))
+        model = model.to(device)
+        class_models[class_] = model
 
     # setup data
     dataset = PandasetDataset(data_root, model_config, test=True)
@@ -233,11 +244,18 @@ def test(
         dataset, num_workers=num_workers, collate_fn=custom_collate
     )
 
-    for idx, (bev_lidar, _, labels) in tqdm(enumerate(dataloader)):
-        model.eval()
-        detections = model.inference(bev_lidar[0].to(device))
+    for idx, (bev_lidar, _, class_labels) in tqdm(enumerate(dataloader)):
+        class_detections = {}
+
+        # For each class, use the corresponding class model to detect
+        for class_ in DETECTING_CLASSES:
+            model = class_models[class_]
+            model.eval()
+            detections = model.inference(bev_lidar[0].to(device))
+            class_detections[class_] = detections
+
         lidar = bev_lidar[0].sum(0).nonzero().detach().cpu()[:, [1, 0]]
-        visualize_detections(lidar, detections, labels[0])
+        visualize_detections(lidar, class_detections, class_labels[0])
         plt.savefig(f"{output_root}/{idx:03d}.png")
         plt.close("all")
 

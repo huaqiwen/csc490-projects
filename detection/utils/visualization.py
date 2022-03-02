@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,6 +6,7 @@ import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Arrow, Rectangle
+from detection.pandaset.util import LabelClass
 
 from detection.types import Detections
 
@@ -55,8 +56,8 @@ def plot_box(
 
 def visualize_detections(
     pointcloud: torch.Tensor,
-    detections: Detections,
-    labels: Optional[Detections] = None,
+    class_detections: Dict[LabelClass, Detections],
+    class_labels: Optional[Dict[LabelClass, Detections]] = None,
     figsize: Tuple[int, int] = (16, 8),
     dpi: int = 75,
 ) -> Tuple[Figure, Axes]:
@@ -76,30 +77,36 @@ def visualize_detections(
     ax.scatter(pointcloud[:, 0], pointcloud[:, 1], s=1)
 
     # Plot labels
-    if labels is not None:
-        for ix in range(len(labels)):
-            plot_box(
-                ax,
-                labels.centroids_x[ix].item(),
-                labels.centroids_y[ix].item(),
-                labels.yaws[ix].item(),
-                labels.boxes_x[ix].item(),
-                labels.boxes_y[ix].item(),
-                (0.0, 1.0, 0.0, 0.5),
-                "Ground Truth",
-            )
+    if class_labels is not None:
+        g = 1.0
+        for _, labels in class_labels.items():
+            for ix in range(len(labels)):
+                plot_box(
+                    ax,
+                    labels.centroids_x[ix].item(),
+                    labels.centroids_y[ix].item(),
+                    labels.yaws[ix].item(),
+                    labels.boxes_x[ix].item(),
+                    labels.boxes_y[ix].item(),
+                    (0.0, g, 0.0, 0.5),
+                    "Ground Truth",
+                )
+            g /= 2
 
     # Plot detections
-    for ix in range(len(detections)):
-        plot_box(
-            ax,
-            detections.centroids_x[ix].item(),
-            detections.centroids_y[ix].item(),
-            detections.yaws[ix].item(),
-            detections.boxes_x[ix].item(),
-            detections.boxes_y[ix].item(),
-            (1.0, 0.0, 0.0, 0.5),
-            "Detections",
-        )
+    r = 1.0
+    for _, detections in class_detections.items():
+        for ix in range(len(detections)):
+            plot_box(
+                ax,
+                detections.centroids_x[ix].item(),
+                detections.centroids_y[ix].item(),
+                detections.yaws[ix].item(),
+                detections.boxes_x[ix].item(),
+                detections.boxes_y[ix].item(),
+                (r, 0.0, 0.0, 0.5),
+                "Detections",
+            )
+        r /= 2
 
     return fig, ax
