@@ -1,0 +1,61 @@
+\documentclass[letter]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{ifthen}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage[shortlabels]{enumitem}
+
+\newcommand{\fref}[1]{\textbf{Figure \ref{#1}}}
+
+%%%
+% Set up the margins to use a fairly large area of the page
+%%%
+\oddsidemargin=.2in
+\evensidemargin=.2in
+\textwidth=6in
+\topmargin=0in
+\textheight=9.0in
+\parskip=.07in
+\parindent=0in
+\pagestyle{fancy}
+
+%%%
+% Set up the header
+%%%
+\newcommand{\setheader}[6]{
+	\lhead{{\sc #1} {\sc #2}\\{} ({\small \it \today})}
+	\rhead{
+		{\bf #3} 
+		\ifthenelse{\equal{#4}{}}{}{(#4)}\\
+		{\bf #5}
+		\ifthenelse{\equal{#6}{}}{}{(#6)}%
+	}
+}
+
+\begin{document}
+	\setheader{CSC490}{Module 1}{Ben Weisz}{}{Qiwen Hua}{}
+
+	\section{Focal Loss \& Anisotropic Guassian}
+
+	\subsection{Motivation}
+
+	\subsection{Techniques}
+
+	\subsection{Evaluation}
+
+	\subsection{Limitations}
+
+	\section{Multi-class Detector}
+
+	\subsection{Motivation}
+
+	\subsection{Techniques}
+
+	\subsection{Evaluation}
+
+	\subsection{Limitations}
+	
+\end{document}
