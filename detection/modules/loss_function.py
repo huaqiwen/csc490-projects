@@ -1,11 +1,17 @@
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Callable
 
 import torch
 from torch import Tensor
 
-def heatmap_weighted_mse_loss(
-    targets: Tensor, predictions: Tensor, heatmap: Tensor, heatmap_threshold: float
+def l2_residual_map(residual: Tensor) -> Tensor:
+    return residual**2
+
+def l1_residual_map(residual: Tensor) -> Tensor:
+    return torch.abs(residual)
+
+def heatmap_weighted_loss(
+    targets: Tensor, predictions: Tensor, heatmap: Tensor, heatmap_threshold: float, residual_map: Callable
 ) -> Tensor:
     """Compute the mean squared error (MSE) loss between `predictions` and `targets`, weighted by a heatmap.
 
@@ -32,7 +38,7 @@ def heatmap_weighted_mse_loss(
 
     # 1 - Compute the MSE Loss between `targets` and `predictions` along the C dimension
     residuals = targets - predictions
-    mse_loss = torch.sum(residuals**2, axis=1)
+    mse_loss = torch.sum(residual_map(residuals), axis=1)
 
     # 2 - Compute the heatmap mask
     # We do this because otherwise we would need to make copy
@@ -62,7 +68,10 @@ class DetectionLossConfig:
             The larger the value, the smaller the spread of the heatmap.
             See `detection/modules/loss_target.py` for usage details.
         use_isotropic_gaussian: A boolean value indicating if an isotropic gaussian should
-            be used for building the target heat map. If False, anisotropic gaussian will be used
+            be used for building the target heat map. If False, anisotropic gaussian will be used.
+        use_focal_loss: A boolean value indicating if a focal loss function should be used.
+        focal_alpha: The alpha value for focal loss.
+        focal_beta: The beta value for focal loss.
     """
 
     heatmap_loss_weight: float
@@ -72,6 +81,9 @@ class DetectionLossConfig:
     heatmap_threshold: float
     heatmap_norm_scale: float
     use_isotropic_gaussian: bool
+    use_focal_loss: bool
+    focal_alpha: float
+    focal_beta: float
 
 
 @dataclass
@@ -95,6 +107,9 @@ class DetectionLossFunction(torch.nn.Module):
         self._size_loss_weight = config.size_loss_weight
         self._heading_loss_weight = config.heading_loss_weight
         self._heatmap_threshold = config.heatmap_threshold
+        self._use_focal_loss = config.use_focal_loss
+        self._focal_alpha = config.focal_alpha
+        self._focal_beta = config.focal_beta
 
     def forward(
         self, predictions: Tensor, targets: Tensor
@@ -115,26 +130,46 @@ class DetectionLossFunction(torch.nn.Module):
         target_offsets = targets[:, 1:3]  # [B x 2 x H x W]
         target_sizes = targets[:, 3:5]  # [B x 2 x H x W]
         target_headings = targets[:, 5:7]  # [B x 2 x H x W]
-
+        
         # 2. Unpack the predictions tensor.
         predicted_heatmap = torch.sigmoid(predictions[:, 0:1])  # [B x 1 x H x W]
         predicted_offsets = predictions[:, 1:3]  # [B x 2 x H x W]
         predicted_sizes = predictions[:, 3:5]  # [B x 2 x H x W]
         predicted_headings = predictions[:, 5:7]  # [B x 2 x H x W]
 
-        # 3. Compute individual loss terms for heatmap, offset, size, and heading.
-        heatmap_loss = ((target_heatmap - predicted_heatmap) ** 2).mean()
-        offset_loss = heatmap_weighted_mse_loss(
-            target_offsets, predicted_offsets, target_heatmap, self._heatmap_threshold
+        # 3. Compute the heatmap loss
+        if not self._use_focal_loss:
+            heatmap_loss = ((target_heatmap - predicted_heatmap) ** 2).mean()
+            residual_map = l2_residual_map
+        else:
+            device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+            heatmap_mask = torch.zeros(target_heatmap.shape).to(device)
+            heatmap_mask[target_heatmap > self._heatmap_threshold] = 1
+            M = torch.count_nonzero(heatmap_mask)
+            
+            heatmap_mask_complement = 1 - heatmap_mask
+
+            one_minus_pred = 1 - predicted_heatmap
+
+            active_loss = heatmap_mask * (one_minus_pred**self._focal_alpha) * torch.log(predicted_heatmap)
+            inactive_loss = heatmap_mask_complement * ((1 - target_heatmap)**self._focal_beta) * (predicted_heatmap**self._focal_alpha) * torch.log(one_minus_pred)
+
+            heatmap_loss = -1 * torch.sum(active_loss + inactive_loss) / M
+
+            residual_map = l1_residual_map
+
+        # 4. Compute individual loss terms for offset, size, and heading.
+        offset_loss = heatmap_weighted_loss(
+            target_offsets, predicted_offsets, target_heatmap, self._heatmap_threshold, residual_map
         )
-        size_loss = heatmap_weighted_mse_loss(
-            target_sizes, predicted_sizes, target_heatmap, self._heatmap_threshold
+        size_loss = heatmap_weighted_loss(
+            target_sizes, predicted_sizes, target_heatmap, self._heatmap_threshold, residual_map
         )
-        heading_loss = heatmap_weighted_mse_loss(
-            target_headings, predicted_headings, target_heatmap, self._heatmap_threshold
+        heading_loss = heatmap_weighted_loss(
+            target_headings, predicted_headings, target_heatmap, self._heatmap_threshold, residual_map
         )
 
-        # 4. Aggregate losses using the configured weights.
+        # 5. Aggregate losses using the configured weights.
         total_loss = (
             heatmap_loss * self._heatmap_loss_weight
             + offset_loss * self._offset_loss_weight
@@ -145,4 +180,5 @@ class DetectionLossFunction(torch.nn.Module):
         loss_metadata = DetectionLossMetadata(
             total_loss, heatmap_loss, offset_loss, size_loss, heading_loss
         )
+
         return total_loss, loss_metadata

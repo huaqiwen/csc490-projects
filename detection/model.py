@@ -30,9 +30,28 @@ class DetectionModelConfig:
             heading_loss_weight=100.0,
             heatmap_threshold=0.01,
             heatmap_norm_scale=20.0,
-            use_isotropic_gaussian=True,
+            use_isotropic_gaussian=False,
+            use_focal_loss=True,
+            focal_alpha=2.0,
+            focal_beta=4.0
         )
     )
+
+    # Regular Training
+    # loss: DetectionLossConfig = field(
+    #     default_factory=lambda: DetectionLossConfig(
+    #         heatmap_loss_weight=100.0,
+    #         offset_loss_weight=10.0,
+    #         size_loss_weight=1.0,
+    #         heading_loss_weight=100.0,
+    #         heatmap_threshold=0.01,
+    #         heatmap_norm_scale=20.0,
+    #         use_isotropic_gaussian=True,
+    #         use_focal_loss=False,
+    #         focal_alpha=2.0,
+    #         focal_beta=4.0
+    #     )
+    # )
 
 
 class DetectionModel(nn.Module):
