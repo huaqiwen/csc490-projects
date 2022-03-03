@@ -134,7 +134,7 @@
 	Below we present the Precision-Recall curves for the values $2, 4, 8, 16$ of $\tau$.
 	\begin{figure}[h]
 		\centering
-		\includegraphics[scale=0.42]{images/prcurve.png}
+		\includegraphics[scale=0.42]{images/prcurve-normal.png}
 		\caption{PR Curve for varying values for the distance threshold $\tau$}
 		\label{fig:prcurve}
 	\end{figure}
@@ -145,9 +145,9 @@
 		\begin{tabular}{|c|c|c|c|c|c|}
 		\hline
 		\textbf{Values of $\tau$} & 2.0 & 4.0 & 8.0 & 16.0 & \textbf{Mean} \\ \hline
-		\textbf{Area Under Curve} & 0.3792 & 0.4521 & 0.4609 & 0.4539 & 0.4365177 \\ \hline
+		\textbf{Area Under Curve} & 0.3792 & 0.4521 & 0.4609 & 0.4539 & 0.4365 \\ \hline
 		\end{tabular}
-		\caption{\label{tab:auc} AUC values for varying distace thresholds $\tau$}
+		\caption{\label{tab:auc} AUC values for varying distance thresholds $\tau$}
 	\end{table}
 
 	When looking at \fref{fig:prcurve} we can see that as we increase our value of $\tau$ we start to see that the initial drop in precision for the top detections decreases. This means that for a larger value of $\tau$, We have less false positives among the top classified vehicles. This can be understood to be caused by how the false positive detections are considered. Since a larger range is considered, chances are that there is a label within the larger range for the value of $\tau$. As we increase $\tau$, we see that the overall precision also increases. Since $\tau$ is larger, the evaluation is much more free with which detections the labels may match.\\\\
