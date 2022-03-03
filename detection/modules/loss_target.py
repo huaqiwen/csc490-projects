@@ -43,7 +43,7 @@ def isotropic_heatmap(grid_coords: Tensor, center: Tensor, scale: float, size: T
 
     return heatmap
 
-def anisotropic_heatmap(grid_coords: Tensor, center: Tensor, scale: float, size: Tuple, yaw: float) -> Tensor:
+def anisotropic_heatmap(grid_coords: Tensor, center: Tensor, size: Tuple, yaw: float) -> Tensor:
     H, W, _ = grid_coords.shape
     cx, cy = center
 
@@ -106,7 +106,7 @@ def create_heatmap(grid_coords: Tensor, center: Tensor, scale: float, size: Tupl
     if use_isotropic_gaussian:
         return isotropic_heatmap(grid_coords, center, scale, size, yaw)
     else:
-        return anisotropic_heatmap(grid_coords, center, scale, size, yaw)
+        return anisotropic_heatmap(grid_coords, center, size, yaw)
 
 
 class DetectionLossTargetBuilder:
