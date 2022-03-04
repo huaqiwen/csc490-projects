@@ -42,20 +42,20 @@
 	\section{Focal Loss \& Anisotropic Guassian}
 
 	\subsection{Motivation}
-	During our evaluation of the original algorithm designed for this module, we noticed the following two things:
+	During our evaluation of the original algorithm designed for this module, we noticed the following three things:
 	\begin{itemize}
 		\item Among the top detections (detections with highest detection scores), we get a considerably lower precision score for the recall aggregates within the recall range of 0 and 0.1 than for range 0.1 to 0.2. What this tells us is that the false positive rates are higher among the top detections than in the 0.1 to 0.2 recall range. This can be seen in the 0.1 to 0.2 range on the horizontal axis in original PR Curve figure in report A for all values of $\tau$.
 		\item As we sweep through the detection scores, the true and false positives are not evenly distributed in the aggregations. We see this in the fact that as we sweep through the detection scores the the curve has a noticeable negative slope. The reason that this may be bad is that we would ideally hope to see a higher rate of true positives even for lower detection scores. Since we get more false positives for the lower detection scores we can see that our current model does not match the ideal case.
 		\item As we sweep through the detection scores we see that the recall scores tend to drop gradually as we decreases the scores. Ideally we would want to see these scores not decrease and then there be an abrupt decrease. This would mean that our model's recall is higher for more detections.
 	\end{itemize}
 
-	By tackling the above three problems we hope to decrease our model's false positive and false negative rates. This is important because by doing so we would increase both our recall and precision, thus leading to a better model overall.\\\\
-	We will now present an overview of our technique, describing it in more detail in the techniques section. We use an anisotropic gaussian to model to model the vehicles for the target heatmap. We then use focal loss as our new loss function. This combination of the anisotropic gaussian and the focal loss function were chosen to hopefully allow the model to better orient the vehicles and because it focal loss helps the model focus on under represented classification cases.\\\\
-	Alternatives to our techniques to tackling these issues will be presented at the end our our techniques section as future work. Both our methods and the alternative methods aim to decrease the false positive and negative rates among the detected vehicles.
+	By tackling the above three problems we hope to decrease our model's false positive and negative rates. By doing this we would increase both our recall and precision, thus leading to a better model overall.\\\\
+	We will now present an overview of our technique, describing it in more detail in the techniques section. We use an anisotropic gaussian to model the vehicles for the target heatmap. We then use focal loss as our new loss function. This combination of the anisotropic gaussian and the focal loss function were chosen to hopefully allow the model to better orient the vehicles and because focal loss helps the model focus on under represented classification cases.\\\\
+	Alternatives to our techniques to tackling these issues will be presented at the end our our techniques section as future work.
 
 	\subsection{Techniques}
 	\textbf{Anistropic Gaussian:}\\
-    The intuition behind using an anisotropic gaussian to model the the vehicle target heatmap is that we want the model to have a better understanding of the rotation and scale of the vehicles from the heatmap. An example output of of the target heatmap is show below in \fref{fig:aniso} During inference we use the heatmap to determine the point where a vehicle is located in the frame. We want to embue the predicted heatmap with orientation as this will help us better localize the vehicles, orient them and scale them. While we did get to implement the anisotropic gaussian, we did not have enough time to correctly make use of the predicted heatmap to help with orientation and scaling. The idea is, that with the predicted heatmap of oriented gaussians we fit a small GMM with one peak with a few iterations at infernce time to the region around the localized vehicle. Once fitted, the covariance matrix can be decomposed in to matricies for orientation and scale using singular value decomposition. These values for orientation and scale could then be combined with the regressed orientation and scale for a hopefully more accurate prediction.
+    The intuition behind using an anisotropic gaussian to model the the vehicle target heatmap is that we want the model to have a better understanding of the rotation and scale of the vehicles from the heatmap. An example output of of the target heatmap is show below in \fref{fig:aniso}. During inference we use the heatmap to determine the point where a vehicle is located in the frame. We want to embue the predicted heatmap with orientation as this will help us better localize the vehicles, orient them and scale them. While we did get to implement the anisotropic gaussian, we did not have enough time to correctly make use of the predicted heatmap to help with orientation and scaling. The idea is, that with the predicted heatmap of oriented gaussians we fit a small GMM with one peak with a few iterations at infernce time to the region around the localized vehicle. Once fitted, the covariance matrix can be decomposed in to matricies for orientation and scale using singular value decomposition. These values for orientation and scale could then be combined with the regressed orientation and scale for a hopefully more accurate prediction.
 
 	\begin{figure}[h]
 		\begin{subfigure}[t]{0.49\textwidth}
@@ -87,7 +87,7 @@
 		\mathcal{N}(x, \textstyle \sum, \mu) = \frac{1}{(2\pi)^\frac{n}{2}}|\textstyle \sum|^{-\frac{1}{2}} exp (-\frac{1}{2}(x-\mu)^\top \textstyle \sum^{-1}(x - \mu))
 	\end{equation}
 	\textbf{Focal Loss:}\\
-	Our intuition behind using focal loss is that we want to fix the inbalance between the types of examples the model sees and trains on. To stop model from localizing too many false positives and missing too may labels (minimizing false negatives) we weight these types of detections heavier in the loss function than ones for which the target does contain a vehicle in the heatmap and the model gets it somewhat right. This puts more emphasis on training the model to correctly classify these harder to detect cases.\\\\
+	Our intuition behind using focal loss is that we want to fix the inbalance between the types of examples the model sees and trains on. To stop model from localizing too many false positives and missing too may labels we weight these types of detections heavier in the loss function. This puts more emphasis on training the model to correctly classify these harder to detect cases.\\\\
 	We use the Focal Loss suggested in \cite{objects-as-points} to compute the loss for our heatmap.
 	\begin{equation}
 		L_k = -\frac{1}{N} \sum_{xy} 
@@ -103,7 +103,7 @@
 		L = \lambda_k L_k + \lambda_{ori} L^1_{ori} + \lambda_{size} L^1_{size} + \lambda_{loc} L^1_{loc}
 	\end{align}
 	\textbf{Further Work:}\\
-	One approach that could be taken to tackle some of the issues highlighted in the motivations would be to try to remove some labels in the raw data that have no overlapping point cloud data. In \fref{fig:false-positive} we can see that there are a lot of labels at the top of the frame were there is no point cloud data, thus making it hard for the model to learn these. In essence, using these labels currently trains the model to generate false positives as detections like these could be generated anywhere in the frame that has no points.\\\\
+	One approach that could be taken to tackle some of the issues with the current model would be to try to remove some labels in the raw data that have no overlapping point cloud data. In \fref{fig:false-positive} we can see that there are a lot of labels at the top of the frame were there is no point cloud data, thus making it hard for the model to learn these. In essence, using these labels currently trains the model to generate false positives as detections like these could be generated anywhere in the frame that has no points.\\\\
 	To combat this, when building the targets, remove labels which have no point cloud data and train on the remaining labels.
 	\begin{figure}[h]
 		\centering
@@ -111,11 +111,10 @@
 		\caption{False positives along top of frame}
 		\label{fig:false-positive}
 	\end{figure}
-	\newpage
 
 	\subsection{Evaluation}
-	Since one of our motivations was to decrease the number of false positives, negatives and increase the number of true positives, we analyzed the precision of the model by generating the PR curve for the new model using the same process as for the original model.\\\\
-	Below we can see that by using focal loss we've managed to smooth out the jump in precision at among the highest detections (except for $\tau=2.0$). Overall, compared to the original model, the false positives are more distributed amongst the true positive detections. This can be seen in the charts below in the fact that the PR curves have a more flatline slope for recall ranges between 0.1 and 0.4.
+	We analyzed the quality of the model by generating the PR curve for the new model using the same process as for the original model because our goals were to decrease the false positives and false negatives and to increase the number of true positives.\\\\
+	Below we can see that by using focal loss we've managed to smooth out the jump in precision among the highest detections (except for $\tau=2.0$). Overall, compared to the original model, the false positives are more distributed amongst the true positive detections. This can be seen in the charts below in the fact that the PR curves have a more flatline slope for recall ranges between 0.1 and 0.4.
 
 	\begin{figure}[!h]
 		\centering
@@ -158,7 +157,7 @@
 		\caption{\label{tab:auc} AUC values for varying distance thresholds $\tau$}
 	\end{table}
 
-	In \fref{fig:comp-det}  we can qualitatively see that the new model is detecting more true positives than the old model quite accurately. 
+	In \fref{fig:comp-det} we can qualitatively see that the new model is detecting more true positives than the old model. 
 
 	\begin{figure}[!h]
 		\centering
@@ -177,7 +176,7 @@
 	\end{figure}
 
 	\subsection{Limitations}
-	Since we did not get to completely implement the inferencing with the anisotropic gaussian we can see that there is a failure case that arises where objects that are further away cannot be properly orientated. An example of this can be seen in \fref{fig:failure} on the right hand side in the center. The green car is orientated parallel to the self driving car and but the detection says that it is roughly at a 45 degree angle.
+	Since we did not get to completely implement the inferencing with the anisotropic gaussian, we can see that there is a failure case that arises where objects that are further away cannot be properly orientated. An example of this can be seen in \fref{fig:failure} on the right hand side in the center. The green car is orientated parallel to the self driving car and but the detection says that it is roughly at a 45 degree angle.
 
 	\begin{figure}[h]
 		\centering
@@ -186,7 +185,7 @@
 		\label{fig:failure}
 	\end{figure}
 	
-	One potential improvement that could be made would be to multiple frames into the model at training time. Similar to how stereo vision allows one to triangulate objects in three dimensions, using multiple frames for one classification would allow the model to better understand where objects are, their size and their orientation. This could significantly improve the model's accuracy on far away objects as it can take multiple lidar measurements of these objects which is often needed due to the lack of data due to distance from the vehicle.
+	One potential improvement that could be made would be feed multiple frames into the model at training time. Similar to how stereo vision allows one to triangulate objects in three dimensions, using multiple frames for one classification would allow the model to better understand where objects are, their size and their orientation. This could significantly improve the model's accuracy on far away objects as it can take multiple lidar measurements of these objects which is often needed due to the lack of data due to distance from the vehicle.
 
 	\section{Multi-class Detector}
 
@@ -202,12 +201,13 @@
 
 	\subsection{Techniques}
 
-    Naturally, the traits (e.g., sizes, average movement speeds, frequently appearing locations) of each classes of objects different wildly. For example, the BEV sizes of vehicles and pedestrians can differ by a factor of 51 ($ 1.7m \times 4.5m $ car and $ 0.5m \times 0.3m $ human). Therefore, if we want our system to be able to predict $ N_c $ object classes, our approach would be to build $ N_c $ detection models each being responsible to detect one corresponding object class. This intuition is similar to one-vs-rest classification where we use multiple binary classifications for multi-class classification. 
+    Naturally, the traits (e.g., sizes, average movement speeds, frequently appearing locations) of each classes of objects differ wildly. For example, the BEV sizes of vehicles and pedestrians can differ by a factor of 51 ($ 1.7m \times 4.5m $ car and $ 0.5m \times 0.3m $ human). Therefore, if we want our system to be able to predict $ N_c $ object classes, our approach would be to build $ N_c $ detection models each being responsible to detect one corresponding object class. This intuition is similar to one-vs-rest classification where we use multiple binary classifications for multi-class classification. 
 
 	Since we are building multiple single-class detection models, we do not need to modify the existing algorithm for the \verb|DetectionModelConfig| and \verb|DetectionModel| Python classes. However, we need to make changes to the following components: \begin{enumerate}
-		\item \textbf{Dataset:} All entrypoints of the detector system use the \verb|pytorch|'s \verb|DataLoader| class to load the dataset of type \verb|PandasetDataset|. Therefore, to include data points from all interested classes, the first step would be to modify the \verb|PandasetDataset| class. 
+		\item \textbf{Dataset:} First, we specify the classes of interest in variable \verb|DETECTING_CLASSES| in \\
+		\verb|detection/pandaset/dataset.py|. All entrypoints of the detector system use the \verb|pytorch|'s \verb|DataLoader| class to load the dataset of type \verb|PandasetDataset|. Therefore, to include data points from all interested classes, the first step would be to modify the \verb|PandasetDataset| class. 
 		
-		The \verb|__getitem__| method originally returns the BEV voxel grid tensor, the ground truth target tensor, and a set of grouud truth BEV detections of class \verb|Dectections|. While the first item (BEV voxel grid) is class independent, the latter two only describes the vehicles. We modifed the last two return types of this function to be dictionaries with the keys being the interested object classes and the values being the original ground truth target tensors and detections. 
+		The \verb|__getitem__| method originally returns the BEV voxel grid tensor, the ground truth target tensor, and a set of ground truth BEV detections of class \verb|Dectections|. While the first item (BEV voxel grid) is class independent, the latter two only describes the vehicles. We modifed the last two return types of this function to be dictionaries with the keys being the interested object classes and the values being the original ground truth target tensors and detections. 
 
 		In addition, we need to modify the \verb|custom_collate| function slightly to be compatible with the modified \verb|__getitem__| method. 
 
@@ -261,9 +261,9 @@
 	\subsection{Limitations}
 
 	As mentioned in \S 2.3 Evaluation, due to limited number of observations, the model performs poorly if the number of iterations (or epochs) is not large enough. In addition, the current neural network setup does not work well with small objects sizes. To better detect small objects such as pedestrians and signs, we may need different hidden layers in the current neural network. With these current limitations in mind, we can improve our multi-class detector with the following potential paths: \begin{enumerate}
-		\item tune a different set of hyperparameters for each object class with a validation dataset;
-		\item train the model with a larger dataset and a larger step size if the sample size is small;
-		\item explore other hidden layers that may be more suitable for detecting smaller objects. 
+		\item Tune a different set of hyperparameters for each object class with a validation dataset;
+		\item Train the model with a larger dataset and a larger step size if the sample size is small;
+		\item Explore other hidden layers that may be more suitable for detecting smaller objects. 
 	\end{enumerate}
 	
 	\begin{thebibliography}{9}
