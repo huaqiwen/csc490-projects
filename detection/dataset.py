@@ -82,7 +82,7 @@ class PandasetDataset:
             2. A Dict[LabelClass, [7 x H x W]] tensor containing the ground truth target tensor for training
                 the `DetectionModel` using a `DetectionLossFunction`. The 7 channels are
                 (heatmap, offset_x, offset_y, x_size, y_size, sin_theta, cos_theta).
-            3. A set of ground truth detections in bird's eye view image space coordinates.
+            3. A Dict[LabelClass, Detection] set of ground truth detections in bird's eye view image space coordinates.
         """
         pandaset_output = self._pandaset[idx]
         lidar_bev = self._voxelizer([pandaset_output.lidar])[0]  # [D x H x W]

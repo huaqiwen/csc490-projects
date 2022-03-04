@@ -59,8 +59,13 @@ def overfit(
         for class_ in DETECTING_CLASSES}
 
     # start training
-    bev_lidar, class_bev_targets, class_labels = next(iter(dataloader))
-    bev_lidar = bev_lidar.to(device)
+    # bev_lidar, class_bev_targets, class_labels = next(iter(dataloader))
+    # bev_lidar = bev_lidar.to(device)
+
+    dataloader_iter = iter(dataloader)
+    for _ in range(199):
+        next(dataloader_iter)
+    bev_lidar, class_bev_targets, class_labels = next(dataloader_iter)
 
     for class_ in class_bev_targets.keys():
         print(f"Overfitting class: {class_.value}")
@@ -149,12 +154,9 @@ def train(
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     os.makedirs(output_root, exist_ok=True)
 
-    # setup model
+    # setup model for all classes
     model_config = DetectionModelConfig()
-    model = DetectionModel(model_config)
-    if checkpoint_path is not None:
-        model.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
-    model = model.to(device)
+    class_models = init_multiclass_models(model_config, device, checkpoint_path)
 
     # setup data
     dataset = PandasetDataset(data_root, model_config)
@@ -167,50 +169,69 @@ def train(
     )
 
     # setup loss function and optimizer
-    loss_fn = DetectionLossFunction(model_config.loss)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    class_loss_fns = {class_: DetectionLossFunction(model_config.loss) 
+        for class_ in DETECTING_CLASSES}
+    class_optimizers = {class_: torch.optim.Adam(class_models[class_].parameters(), lr=learning_rate) 
+        for class_ in DETECTING_CLASSES}
 
     # start training
     for epoch in range(num_epochs):
-        for idx, (bev_lidar, bev_targets, labels) in tqdm(enumerate(dataloader)):
-            model.train()
-            predictions = model(bev_lidar.to(device))
-            loss, loss_metadata = loss_fn(predictions, bev_targets.to(device))
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        for idx, (bev_lidar, class_bev_targets, class_labels) in tqdm(enumerate(dataloader)):
+            for class_ in class_bev_targets.keys():
+                # Skip if there are no objects under this class
+                if len(class_labels[0][class_]) == 0:
+                    continue
 
-            # inference on the training example, and save vis results
-            if (idx + 1) % log_frequency == 0:
-                print(
-                    f"Epoch {epoch} [{idx}/{len(dataloader)}]: "
-                    f"Loss - {loss.item():.4f} "
-                    f"Heatmap Loss - {loss_metadata.heatmap_loss.item():.4f} "
-                    f"Offset Loss - {loss_metadata.offset_loss.item():.4f} "
-                    f"Size Loss - {loss_metadata.size_loss.item():.4f} "
-                    f"Heading Loss - {loss_metadata.heading_loss.item():.4f} "
-                )
+                print(f"Trainning on class: {class_.value}")
 
-                # visualize target heatmap
-                target_heatmap = bev_targets[0, 0].cpu().detach().numpy()
-                plt.matshow(target_heatmap, origin="lower")
-                plt.savefig(f"{output_root}/target_heatmap.png")
+                # define targets and labels for the current class
+                bev_targets, labels = class_bev_targets[class_], class_labels[0][class_]
+                bev_targets = bev_targets.to(device)
 
-                # visualize predicted heatmap
-                predicted_heatmap = predictions[0, 0].cpu().detach().sigmoid().numpy()
-                plt.matshow(predicted_heatmap, origin="lower")
-                plt.savefig(f"{output_root}/predicted_heatmap.png")
+                # define model, loss_fn, and optimizer for the current class
+                model = class_models[class_]
+                loss_fn, optimizer = class_loss_fns[class_], class_optimizers[class_]
 
-                # visualize detections and ground truth
-                with torch.no_grad():
-                    model.eval()
-                    detections = model.inference(bev_lidar[0].to(device))
-                lidar = bev_lidar[0].sum(0).nonzero().detach().cpu()[:, [1, 0]]
-                visualize_detections(lidar, detections, labels[0])
-                plt.savefig(f"{output_root}/detections.png")
-                plt.close("all")
+                model.train()
+                predictions = model(bev_lidar.to(device))
+                loss, loss_metadata = loss_fn(predictions, bev_targets.to(device))
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-        torch.save(model.state_dict(), f"{output_root}/{epoch:03d}.pth")
+                # inference on the training example, and save vis results
+                if (idx + 1) % log_frequency == 0:
+                    print(
+                        f"Epoch {epoch} [{idx}/{len(dataloader)}]: "
+                        f"Loss - {loss.item():.4f} "
+                        f"Heatmap Loss - {loss_metadata.heatmap_loss.item():.4f} "
+                        f"Offset Loss - {loss_metadata.offset_loss.item():.4f} "
+                        f"Size Loss - {loss_metadata.size_loss.item():.4f} "
+                        f"Heading Loss - {loss_metadata.heading_loss.item():.4f} "
+                    )
+
+                    # visualize target heatmap
+                    target_heatmap = bev_targets[0, 0].cpu().detach().numpy()
+                    plt.matshow(target_heatmap, origin="lower")
+                    plt.savefig(f"{output_root}/target_heatmap_{class_.value}.png")
+
+                    # visualize predicted heatmap
+                    predicted_heatmap = predictions[0, 0].cpu().detach().sigmoid().numpy()
+                    plt.matshow(predicted_heatmap, origin="lower")
+                    plt.savefig(f"{output_root}/predicted_heatmap_{class_.value}.png")
+
+                    # visualize detections and ground truth
+                    with torch.no_grad():
+                        model.eval()
+                        detections = model.inference(bev_lidar[0].to(device))
+                    lidar = bev_lidar[0].sum(0).nonzero().detach().cpu()[:, [1, 0]]
+                    visualize_detections(lidar, detections, labels[0])
+                    plt.savefig(f"{output_root}/detections_{class_.value}.png")
+                    plt.close("all")
+
+        # save model checkpoints for all classes
+        for model in class_models.values():
+            torch.save(model.state_dict(), f"{output_root}/{epoch:03d}_{class_.value}.pth")
 
 
 @torch.no_grad()

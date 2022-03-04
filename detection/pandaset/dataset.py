@@ -19,7 +19,7 @@ from detection.pandaset.util import (
 
 
 # The classes of interest
-DETECTING_CLASSES = [LabelClass.CAR, LabelClass.PEDESTRIAN, LabelClass.BICYCLE]
+DETECTING_CLASSES = [LabelClass.CAR]
 
 
 @dataclass
