@@ -182,7 +182,6 @@ def train(
                 if len(class_labels[0][class_]) == 0:
                     continue
 
-                print(f"Trainning on class: {class_.value}")
 
                 # define targets and labels for the current class
                 bev_targets, labels = class_bev_targets[class_], class_labels[0][class_]
