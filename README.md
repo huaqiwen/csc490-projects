@@ -1,7 +1,14 @@
 # CSC490H1: Making Your Self-driving Car Perceive the World
 
-This repository contains the starter code for CSC490H1:
+This repository contains our implementation for Module 1 of CSC490H1:\
 Making Your Self-driving Car Perceive the World.
+
+## Overview
+
+The detector is trained on 27 sequences of the [PandaSet](https://scale.com/open-datasets/pandaset) LiDAR dataset. \
+The video below demonstrates vehicle detections on 960 frames of 12 testing sequences (different from the training sequences), with the green boxes being the ground truth labels and red boxes being the detections:
+
+https://user-images.githubusercontent.com/37789937/156686621-7a5a93c0-ca9a-45bd-b0f3-a82aac14e6c7.mp4
 
 ## Getting started
 
